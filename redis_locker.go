@@ -8,6 +8,7 @@ import (
 
 const _lockHoldersHashSet = "all_lock_holders"
 
+//redis 锁
 type RedisLock struct {
 	Key           string //锁key
 	Holder        string //锁拥有者
