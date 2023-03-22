@@ -57,7 +57,7 @@ func AcquireLockWithExpire(conn *redis.Conn, key string, holder string, expireSe
 }
 
 //释放锁
-func ReleaseLock(client *redis.Client, key string, holder string) (bool, error) {
+func ReleaseLock(client *redis.Conn, key string, holder string) (bool, error) {
 	b := false
 	var err error
 	currHolder, err := client.HGet(context.Background(), _lockHoldersHashSet, key).Result()
@@ -74,7 +74,7 @@ func ReleaseLock(client *redis.Client, key string, holder string) (bool, error) 
 }
 
 //释放
-func (lock *RedisLock) ReleaseSelf(client *redis.Client) (bool, error) {
+func (lock *RedisLock) ReleaseSelf(client *redis.Conn) (bool, error) {
 	b := false
 	var err error
 	currHolder, err := client.HGet(context.Background(), _lockHoldersHashSet, lock.Key).Result()
@@ -91,7 +91,7 @@ func (lock *RedisLock) ReleaseSelf(client *redis.Client) (bool, error) {
 }
 
 //清除指定holder的拥有的所有锁
-func ClearLocks(client *redis.Client, holder string) error {
+func ClearLocks(client *redis.Conn, holder string) error {
 	holderLocks, err := client.HGetAll(context.Background(), _lockHoldersHashSet).Result()
 	if err != nil {
 		return err
