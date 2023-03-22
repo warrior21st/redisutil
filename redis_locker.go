@@ -1,9 +1,10 @@
 package redisutil
 
 import (
+	"context"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 )
 
 const _lockHoldersHashSet = "all_lock_holders"
@@ -16,12 +17,12 @@ type RedisLock struct {
 }
 
 //获取锁（永不过期）
-func AcquireLock(client *redis.Client, key string, holder string) (*RedisLock, error) {
+func AcquireLock(client *redis.Conn, key string, holder string) (*RedisLock, error) {
 	return AcquireLockWithExpire(client, key, holder, 0)
 }
 
 //获取锁（带过期时间）
-func AcquireLockWithExpire(client *redis.Client, key string, holder string, expireSeconds int64) (*RedisLock, error) {
+func AcquireLockWithExpire(conn *redis.Conn, key string, holder string, expireSeconds int64) (*RedisLock, error) {
 	var (
 		lock *RedisLock
 		err  error
@@ -29,14 +30,14 @@ func AcquireLockWithExpire(client *redis.Client, key string, holder string, expi
 		temp int32 = 0
 	)
 	for lock == nil {
-		b, err = client.SetNX(key, "1", 0).Result()
+		b, err = conn.SetNX(context.Background(), key, "1", 0).Result()
 		if err != nil {
 			return lock, err
 		}
 		if b {
-			client.HSet(_lockHoldersHashSet, key, holder)
+			conn.HSet(context.Background(), _lockHoldersHashSet, key, holder)
 			if expireSeconds > 0 {
-				client.Expire(key, time.Second*time.Duration(expireSeconds))
+				conn.Expire(context.Background(), key, time.Second*time.Duration(expireSeconds))
 			}
 			lock = &RedisLock{
 				Key:           key,
@@ -59,13 +60,13 @@ func AcquireLockWithExpire(client *redis.Client, key string, holder string, expi
 func ReleaseLock(client *redis.Client, key string, holder string) (bool, error) {
 	b := false
 	var err error
-	currHolder, err := client.HGet(_lockHoldersHashSet, key).Result()
+	currHolder, err := client.HGet(context.Background(), _lockHoldersHashSet, key).Result()
 	if err != nil {
 		return b, err
 	}
 	if currHolder == holder {
-		client.Del(key)
-		client.HDel(_lockHoldersHashSet, key)
+		client.Del(context.Background(), key)
+		client.HDel(context.Background(), _lockHoldersHashSet, key)
 		b = true
 	}
 
@@ -76,13 +77,13 @@ func ReleaseLock(client *redis.Client, key string, holder string) (bool, error) 
 func (lock *RedisLock) ReleaseSelf(client *redis.Client) (bool, error) {
 	b := false
 	var err error
-	currHolder, err := client.HGet(_lockHoldersHashSet, lock.Key).Result()
+	currHolder, err := client.HGet(context.Background(), _lockHoldersHashSet, lock.Key).Result()
 	if err != nil {
 		return b, err
 	}
 	if currHolder == lock.Holder {
-		client.Del(lock.Key)
-		client.HDel(_lockHoldersHashSet, lock.Key)
+		client.Del(context.Background(), lock.Key)
+		client.HDel(context.Background(), _lockHoldersHashSet, lock.Key)
 		b = true
 	}
 
@@ -91,14 +92,14 @@ func (lock *RedisLock) ReleaseSelf(client *redis.Client) (bool, error) {
 
 //清除指定holder的拥有的所有锁
 func ClearLocks(client *redis.Client, holder string) error {
-	holderLocks, err := client.HGetAll(_lockHoldersHashSet).Result()
+	holderLocks, err := client.HGetAll(context.Background(), _lockHoldersHashSet).Result()
 	if err != nil {
 		return err
 	}
 	for key, val := range holderLocks {
 		if val == holder {
-			client.Del(key)
-			client.HDel(_lockHoldersHashSet, key)
+			client.Del(context.Background(), key)
+			client.HDel(context.Background(), _lockHoldersHashSet, key)
 		}
 	}
 

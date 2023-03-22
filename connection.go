@@ -1,7 +1,7 @@
 package redisutil
 
 import (
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 )
 
 func GetNewClient(connStr string) *redis.Client {

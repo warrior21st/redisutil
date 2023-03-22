@@ -1,17 +1,19 @@
 package redisutil
 
 import (
+	"context"
 	"strings"
 
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 )
 
-func Enqueue(rc *redis.Client, queueName string, val string) {
-	rc.LPush(queueName, val)
+func Enqueue(rc *redis.Conn, queueName string, val string) {
+
+	rc.LPush(context.Background(), queueName, val)
 }
 
-func Dequeue(rc *redis.Client, queueName string) string {
-	b, err := rc.RPopLPush(queueName, getDequeuedBackupKey(queueName)).Result()
+func Dequeue(rc *redis.Conn, queueName string) string {
+	b, err := rc.RPopLPush(context.Background(), queueName, getDequeuedBackupKey(queueName)).Result()
 	if err != nil && err != redis.Nil {
 		panic(err)
 	}
@@ -23,10 +25,10 @@ func Dequeue(rc *redis.Client, queueName string) string {
 	return b
 }
 
-func RestoreDequeuedBackup(client *redis.Client, queueName string) {
+func RestoreDequeuedBackup(client *redis.Conn, queueName string) {
 	backupKey := getDequeuedBackupKey(queueName)
 	for {
-		err := client.RPopLPush(backupKey, queueName).Err()
+		err := client.RPopLPush(context.Background(), backupKey, queueName).Err()
 		if err != nil {
 			if err == redis.Nil {
 				break
@@ -37,8 +39,8 @@ func RestoreDequeuedBackup(client *redis.Client, queueName string) {
 	}
 }
 
-func DelLastDequeuedBackup(client *redis.Client, queueName string) {
-	client.LTrim(getDequeuedBackupKey(queueName), 1, -1)
+func DelLastDequeuedBackup(client *redis.Conn, queueName string) {
+	client.LTrim(context.Background(), getDequeuedBackupKey(queueName), 1, -1)
 }
 
 func getDequeuedBackupKey(queueName string) string {
